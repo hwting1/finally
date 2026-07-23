@@ -1,0 +1,4 @@
+interface:
+  display_name: "Doc Review"
+  short_description: "Review planning docs and append actionable feedback."
+  default_prompt: "Use $doc-review to review the named planning document and append questions, clarifications, simplification opportunities, and feedback."
