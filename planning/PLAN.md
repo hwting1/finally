@@ -12,12 +12,12 @@ This is the capstone project for an agentic AI coding course. It is built entire
 
 ### First Launch
 
-The user runs a single Docker command (or a provided start script). A browser opens to `http://localhost:8000`. No login, no signup. They immediately see:
+The user runs the provided startup script for their platform (`scripts/start_mac.sh` on macOS/Linux or `scripts/start_windows.ps1` on Windows). A browser opens to `http://localhost:8000`. No login, no signup. They immediately see:
 
 - A watchlist of 10 default tickers with live-updating prices in a grid
 - $10,000 in virtual cash
 - A dark, data-rich trading terminal aesthetic
-- An AI chat panel ready to assist
+- An AI chat panel ready to assist when an LLM key is configured, or a clear disabled-chat state when it is not
 
 ### What the User Can Do
 
@@ -26,8 +26,8 @@ The user runs a single Docker command (or a provided start script). A browser op
 - **Click a ticker** to see a larger detailed chart in the main chart area
 - **Buy and sell shares** — market orders only, instant fill at current price, no fees, no confirmation dialog
 - **Monitor their portfolio** — a heatmap (treemap) showing positions sized by weight and colored by P&L, plus a P&L chart tracking total portfolio value over time
-- **View a positions table** — ticker, quantity, average cost, current price, unrealized P&L, % change
-- **Chat with the AI assistant** — ask about their portfolio, get analysis, and have the AI execute trades and manage the watchlist through natural language
+- **View a positions table** — ticker, quantity, average cost, current price, unrealized P&L, and unrealized return % against average cost
+- **Chat with the AI assistant** — when an LLM key or mock mode is configured, ask about their portfolio, get analysis, and have the AI execute trades and manage the watchlist through natural language
 - **Manage the watchlist** — add/remove tickers manually or via the AI chat
 
 ### Visual Design
@@ -76,7 +76,7 @@ The user runs a single Docker command (or a provided start script). A browser op
 | SSE over WebSockets | One-way push is all we need; simpler, no bidirectional complexity, universal browser support |
 | Static Next.js export | Single origin, no CORS issues, one port, one container, simple deployment |
 | SQLite over Postgres | No auth = no multi-user = no need for a database server; self-contained, zero config |
-| Single Docker container | Students run one command; no docker-compose for production, no service orchestration |
+| Single Docker container | Students use one platform script to run one container; no production service orchestration required |
 | uv for Python | Fast, modern Python project management; reproducible lockfile; what students should learn |
 | Market orders only | Eliminates order book, limit order logic, partial fills — dramatically simpler portfolio math |
 
@@ -102,7 +102,8 @@ finally/
 │   └── .gitkeep              # Directory exists in repo; finally.db is gitignored
 ├── Dockerfile                # Multi-stage build (Node → Python)
 ├── docker-compose.yml        # Optional convenience wrapper
-├── .env                      # Environment variables (gitignored, .env.example committed)
+├── .env.example              # Committed template for local configuration
+├── .env                      # Local environment variables (gitignored)
 └── .gitignore
 ```
 
@@ -121,7 +122,7 @@ finally/
 ## 5. Environment Variables
 
 ```bash
-# Required: LLM provider API key for chat functionality
+# Optional: LLM provider API key for chat functionality
 LLM_API_KEY=your-llm-provider-api-key-here
 
 # Default: Google Gemini OpenAI-compatible API base URL.
@@ -144,12 +145,14 @@ LLM_MOCK=false
 - If `MASSIVE_API_KEY` is set and non-empty → backend uses Massive REST API for market data
 - If `MASSIVE_API_KEY` is absent or empty → backend uses the built-in market simulator
 - If `LLM_MOCK=true` → backend returns deterministic mock LLM responses (for E2E tests)
+- If `LLM_API_KEY` is missing and `LLM_MOCK=false` → the app still launches, but chat is disabled with a clear UI/API error explaining that an LLM key is required
 - `LLM_BASE_URL` defaults to Google Gemini OpenAI compatibility: `https://generativelanguage.googleapis.com/v1beta/openai/`
 - `LLM_MODEL` defaults to `gemini-3-flash`
 - If `LLM_BASE_URL` is changed and non-empty → backend passes it to the OpenAI SDK client so other OpenAI-compatible providers can be used
 - If `LLM_BASE_URL` is absent or empty → backend uses the OpenAI SDK default base URL
 - `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL` are read by the backend at startup and should be easy for makers to change in `.env`
 - The backend reads `.env` from the project root (mounted into the container or read via docker `--env-file`)
+- `.env.example` is committed with safe defaults and placeholder credentials; real `.env` files stay out of version control
 
 ---
 
@@ -157,16 +160,15 @@ LLM_MOCK=false
 
 ### Two Implementations, One Interface
 
-Both the simulator and the Massive client implement the same abstract interface. The backend selects which to use based on the environment variable. All downstream code (SSE streaming, price cache, frontend) is agnostic to the source.
+The simulator is the required market data provider. The optional Massive client implements the same abstract interface and may be enabled by environment variable, but real market data is an extension point rather than a core acceptance requirement. All downstream code (SSE streaming, price cache, frontend) is agnostic to the source.
 
 ### Simulator (Default)
 
-- Generates prices using geometric Brownian motion (GBM) with configurable drift and volatility per ticker
+- Starts with a deterministic per-ticker random walk for stable development and testing
 - Updates at ~500ms intervals
-- Correlated moves across tickers (e.g., tech stocks move together)
-- Occasional random "events" — sudden 2-5% moves on a ticker for drama
 - Starts from realistic seed prices (e.g., AAPL ~$190, GOOGL ~$175, etc.)
 - Runs as an in-process background task — no external dependencies
+- GBM, correlated moves, and random market events are optional enhancements after core streaming and portfolio logic are stable
 
 ### Massive API (Optional)
 
@@ -175,20 +177,43 @@ Both the simulator and the Massive client implement the same abstract interface.
 - Free tier (5 calls/min): poll every 15 seconds
 - Paid tiers: poll every 2-15 seconds depending on tier
 - Parses REST response into the same format as the simulator
+- During closed-market periods, shows the latest real price with a stale or closed-market label instead of switching silently to simulated prices
 
 ### Shared Price Cache
 
 - A single background task (simulator or Massive poller) writes to an in-memory price cache
 - The cache holds the latest price, previous price, and timestamp for each ticker
 - SSE streams read from this cache and push updates to connected clients
+- The tracked ticker universe is the union of watchlist tickers and position tickers
 - This architecture supports future multi-user scenarios without changes to the data layer
 
 ### SSE Streaming
 
 - Endpoint: `GET /api/stream/prices`
 - Long-lived SSE connection; client uses native `EventSource` API
-- Server pushes price updates for all tickers known to the system at a regular cadence (~500ms) — in the single-user model this is equivalent to the user's watchlist
-- Each SSE event contains ticker, price, previous price, timestamp, and change direction
+- Server sends an initial snapshot, then pushes batch price updates for all tracked tickers at a regular cadence (~500ms in simulator mode)
+- Each SSE data payload is JSON with UTC timestamps:
+
+```json
+{
+  "type": "prices",
+  "timestamp": "2026-07-28T12:00:00Z",
+  "prices": [
+    {
+      "ticker": "AAPL",
+      "price": 190.12,
+      "previous_price": 189.88,
+      "change": 0.24,
+      "change_percent": 0.1264,
+      "direction": "up",
+      "stale": false,
+      "source": "simulator"
+    }
+  ]
+}
+```
+
+- The server sends heartbeat events when no price update is available so the frontend can distinguish a quiet stream from a broken connection
 - Client handles reconnection automatically (EventSource has built-in retry)
 
 ---
@@ -237,7 +262,7 @@ All tables include a `user_id` column defaulting to `"default"`. This is hardcod
 - `price` REAL
 - `executed_at` TEXT (ISO timestamp)
 
-**portfolio_snapshots** — Portfolio value over time (for P&L chart). Recorded every 30 seconds by a background task, and immediately after each trade execution.
+**portfolio_snapshots** — Portfolio value over time (for P&L chart). Recorded every 30 seconds by a background task, and immediately after each trade execution. Retain a bounded history per user (for example, the latest 2,000 snapshots) so the demo database cannot grow indefinitely.
 - `id` TEXT PRIMARY KEY (UUID)
 - `user_id` TEXT (default: `"default"`)
 - `total_value` REAL
@@ -255,6 +280,16 @@ All tables include a `user_id` column defaulting to `"default"`. This is hardcod
 
 - One user profile: `id="default"`, `cash_balance=10000.0`
 - Ten watchlist entries: AAPL, GOOGL, MSFT, AMZN, TSLA, NVDA, META, JPM, V, NFLX
+
+### Ticker and Quantity Rules
+
+- Normalize tickers by trimming whitespace and uppercasing before validation or persistence
+- A valid ticker is 1-5 uppercase letters for the core simulator path; optional real-data providers may apply stricter provider-specific validation
+- For simulator mode, valid unknown tickers start from a deterministic default seed price and then join the normal price stream
+- Reject unsupported or invalid symbols with a structured API error
+- Allow trading valid tickers that are not already on the watchlist; successful trades automatically add the ticker to the watchlist and price-tracking universe
+- Support fractional shares with a fixed precision limit of up to 6 decimal places
+- Reject zero, negative, non-numeric, or over-precision quantities before portfolio math runs
 
 ---
 
@@ -288,6 +323,30 @@ All tables include a `user_id` column defaulting to `"default"`. This is hardcod
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/health` | Health check (for Docker/deployment) |
+
+### API Contract Rules
+
+- Finalize request, response, action-result, and error schemas before frontend and backend development begins
+- All successful responses return JSON objects, not bare arrays, so future metadata can be added without breaking clients
+- All errors use a consistent shape:
+
+```json
+{
+  "error": {
+    "code": "INSUFFICIENT_CASH",
+    "message": "Not enough cash to buy 10 shares of AAPL.",
+    "details": {
+      "ticker": "AAPL",
+      "required_cash": 1901.2,
+      "available_cash": 1000.0
+    }
+  }
+}
+```
+
+- Trade responses include the trade, updated cash balance, affected position, resulting portfolio total, and whether the ticker was added to the watchlist
+- Chat responses include the assistant message plus per-action results with validation status, execution status, timestamp, and resulting portfolio or watchlist changes
+- `GET /api/portfolio/history` accepts limit/window parameters and defaults to a bounded result set
 
 ---
 
@@ -324,6 +383,8 @@ When the user sends a chat message, the backend:
 7. Stores the message and executed actions in `chat_messages`
 8. Returns the complete JSON response to the frontend (no token-by-token streaming — a loading indicator is sufficient)
 
+If chat is disabled because no LLM key is configured and mock mode is off, `POST /api/chat` returns a structured configuration error and the frontend shows the chat panel in a disabled state. The rest of the workstation remains usable.
+
 ### Structured Output Schema
 
 The LLM is instructed to respond with JSON matching this schema:
@@ -351,7 +412,14 @@ Trades specified by the LLM execute automatically — no confirmation dialog. Th
 - It creates an impressive, fluid demo experience
 - It demonstrates agentic AI capabilities — the core theme of the course
 
-If a trade fails validation (e.g., insufficient cash), the error is included in the chat response so the LLM can inform the user.
+Every AI-generated action uses the same backend validation as manual actions, plus AI-specific guardrails:
+
+- Enforce configurable AI action limits, defaulting to at most 5 actions per chat response and a maximum AI-generated order notional of 50% of current portfolio value
+- Reject invalid tickers and unsupported quantities before execution
+- Execute valid actions independently and report partial failures without rolling back unrelated successful actions
+- Record each requested AI action, validation result, execution status, timestamp, and resulting portfolio or watchlist change in `chat_messages.actions`
+
+If a trade fails validation (e.g., insufficient cash), the error is included in the chat response so the assistant can explain what happened.
 
 ### System Prompt Guidance
 
@@ -378,19 +446,19 @@ When `LLM_MOCK=true`, the backend returns deterministic mock responses instead o
 
 The frontend is a single-page application with a dense, terminal-inspired layout. The specific component architecture and layout system is up to the Frontend Engineer, but the UI should include these elements:
 
-- **Watchlist panel** — grid/table of watched tickers with: ticker symbol, current price (flashing green/red on change), daily change %, and a sparkline mini-chart (accumulated from SSE since page load)
+- **Watchlist panel** — grid/table of watched tickers with: ticker symbol, current price (flashing green/red on change), daily market change %, stale/closed-market label when applicable, and a sparkline mini-chart (accumulated from SSE since page load)
 - **Main chart area** — larger chart for the currently selected ticker, with at minimum price over time. Clicking a ticker in the watchlist selects it here.
 - **Portfolio heatmap** — treemap visualization where each rectangle is a position, sized by portfolio weight, colored by P&L (green = profit, red = loss)
 - **P&L chart** — line chart showing total portfolio value over time, using data from `portfolio_snapshots`
-- **Positions table** — tabular view of all positions: ticker, quantity, avg cost, current price, unrealized P&L, % change
+- **Positions table** — tabular view of all positions: ticker, quantity, avg cost, current price, unrealized P&L, and unrealized return % against average cost
 - **Trade bar** — simple input area: ticker field, quantity field, buy button, sell button. Market orders, instant fill.
-- **AI chat panel** — docked/collapsible sidebar. Message input, scrolling conversation history, loading indicator while waiting for LLM response. Trade executions and watchlist changes shown inline as confirmations.
+- **AI chat panel** — docked/collapsible sidebar. Message input, scrolling conversation history, loading indicator while waiting for LLM response. Trade executions and watchlist changes shown inline as confirmations. If no LLM key is configured and mock mode is off, the panel is visibly disabled with the configuration error.
 - **Header** — portfolio total value (updating live), connection status indicator, cash balance
 
 ### Technical Notes
 
 - Use `EventSource` for SSE connection to `/api/stream/prices`
-- Canvas-based charting library preferred (Lightweight Charts or Recharts) for performance
+- Use one charting library for sparklines, the main chart, and the P&L chart whenever practical
 - Price flash effect: on receiving a new price, briefly apply a CSS class with background color transition, then remove it
 - All API calls go to the same origin (`/api/*`) — no CORS configuration needed
 - Tailwind CSS for styling with a custom dark theme
@@ -427,7 +495,11 @@ docker run -v finally-data:/app/db -p 8000:8000 --env-file .env finally
 
 The `db/` directory in the project root maps to `/app/db` in the container. The backend writes `finally.db` to this path.
 
+Provide reset scripts or documented reset commands that remove the development/test database volume and recreate a clean seeded state. Test data should be isolated from development data.
+
 ### Start/Stop Scripts
+
+The primary launch path is platform-specific scripts. Direct Docker commands and `docker-compose.yml` remain optional alternatives for advanced users.
 
 **`scripts/start_mac.sh`** (macOS/Linux):
 - Builds the Docker image if not already built (or if `--build` flag passed)
@@ -480,3 +552,21 @@ The container is designed to deploy to AWS App Runner, Render, or any container 
 - Portfolio visualization: heatmap renders with correct colors, P&L chart has data points
 - AI chat (mocked): send a message, receive a response, trade execution appears inline
 - SSE resilience: disconnect and verify reconnection
+
+### Acceptance Criteria
+
+- First launch: the platform script builds if needed, starts one container on port 8000, serves the frontend through FastAPI, and shows the seeded watchlist and $10,000 cash balance without requiring an LLM key
+- Static serving: refreshing any frontend route returns the exported app instead of a 404, while `/api/*` routes continue to resolve to FastAPI
+- SSE reconnect: the frontend shows connected/reconnecting/disconnected states and resumes receiving batch price updates after a forced disconnect
+- Trade validation: invalid tickers, invalid quantities, insufficient cash, and insufficient shares all return structured errors; valid trades update cash, positions, snapshots, and tracked tickers
+- LLM output handling: malformed structured output, invalid actions, partial action failures, and disabled-chat configuration all produce deterministic API responses and visible chat UI states
+
+---
+
+## 13. Agent Sequencing
+
+1. Finalize shared contracts: API schemas, SSE payload, error shape, ticker rules, `.env.example`, and mock fixtures
+2. Build backend foundations: configuration, database initialization, simulator, price cache, portfolio math, REST endpoints, and bounded snapshots
+3. Build frontend integration: static Next.js export, API client, SSE client, core layout, watchlist, trade bar, portfolio summary, and connection states
+4. Add LLM features: mock mode, provider configuration, structured-output parsing, chat persistence, AI action guardrails, and action audit display
+5. Add visual polish and advanced data: chart styling, heatmap refinements, optional Massive provider, closed-market labels, and stretch deployment assets
