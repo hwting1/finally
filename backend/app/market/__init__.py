@@ -7,7 +7,11 @@ from app.market.models import (
     MarketSource,
     PriceQuote,
 )
-from app.market.provider import MarketDataProvider
+from app.market.provider import (
+    MarketDataProvider,
+    create_market_provider,
+    default_poll_interval_seconds,
+)
 from app.market.simulator import SimulatedMarketDataProvider
 
 __all__ = [
@@ -18,4 +22,6 @@ __all__ = [
     "MarketSource",
     "PriceQuote",
     "SimulatedMarketDataProvider",
+    "create_market_provider",
+    "default_poll_interval_seconds",
 ]

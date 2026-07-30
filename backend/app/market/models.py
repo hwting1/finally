@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
 
@@ -58,6 +58,9 @@ class PriceQuote:
         if self.previous_price is None or self.price == self.previous_price:
             return "flat"
         return "up" if self.price > self.previous_price else "down"
+
+    def with_previous_price(self, previous_price: float | None) -> "PriceQuote":
+        return replace(self, previous_price=previous_price)
 
 
 @dataclass(frozen=True, slots=True)
