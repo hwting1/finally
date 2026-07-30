@@ -19,10 +19,8 @@ uv run pytest
 
 Latest market-data validation:
 
-- `uv run pytest` -> `24 passed, 1 warning`
+- `uv run pytest` -> `24 passed`
 - `uv run python -m compileall app tests market_data_demo.py` -> passed
-
-The warning is a third-party FastAPI/Starlette `TestClient` deprecation warning and does not affect test success.
 
 ## Market Data Demo
 

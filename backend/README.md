@@ -32,10 +32,8 @@ uv run pytest
 Current expected result:
 
 ```text
-24 passed, 1 warning
+24 passed
 ```
-
-The warning is a third-party FastAPI/Starlette `TestClient` deprecation warning about `httpx`; it does not indicate a failing backend test.
 
 ## Run The API
 

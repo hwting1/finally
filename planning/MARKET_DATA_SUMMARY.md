@@ -241,7 +241,7 @@ cd backend && uv run pytest
 Latest result:
 
 ```text
-24 passed, 1 warning
+24 passed
 ```
 
 Additional validation:
@@ -263,10 +263,6 @@ Result:
 ```text
 10 60.0
 ```
-
-Known warning:
-
-- FastAPI/Starlette emits a `TestClient` deprecation warning about `httpx`. Tests still pass. This is a dependency-level warning and can be addressed later if the project adopts Starlette's recommended replacement path.
 
 ## Review Findings Addressed
 
