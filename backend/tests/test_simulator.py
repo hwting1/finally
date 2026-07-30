@@ -5,7 +5,12 @@ from typing import Awaitable, TypeVar
 import pytest
 
 from app.market.models import MarketSession, MarketSource
-from app.market.simulator import SimulatedMarketDataProvider, seed_price_for_ticker
+from app.market.service import DEFAULT_WATCHLIST_TICKERS
+from app.market.simulator import (
+    DEFAULT_SEED_PRICES,
+    SimulatedMarketDataProvider,
+    seed_price_for_ticker,
+)
 
 
 NOW = datetime(2026, 7, 30, 12, tzinfo=timezone.utc)
@@ -100,3 +105,7 @@ def test_previous_day_bar_skips_weekend() -> None:
 def test_update_interval_must_be_positive() -> None:
     with pytest.raises(ValueError, match="must be positive"):
         SimulatedMarketDataProvider(update_interval_seconds=0)
+
+
+def test_default_watchlist_tickers_have_explicit_seed_prices() -> None:
+    assert DEFAULT_WATCHLIST_TICKERS <= set(DEFAULT_SEED_PRICES)
