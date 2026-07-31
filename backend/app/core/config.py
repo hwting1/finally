@@ -8,6 +8,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore")
 
+    llm_api_key: str = ""
+    llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    llm_model: str = "gemini-3-flash"
+    llm_mock: bool = False
+    llm_max_actions: int = 5
+    llm_max_order_notional_portfolio_fraction: float = 0.5
+
+    database_path: str = "../db/finally.db"
     massive_api_key: str = ""
     market_poll_interval_seconds: float | None = None
     market_stale_after_seconds: float = 30.0

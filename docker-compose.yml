@@ -1,0 +1,30 @@
+services:
+  finally:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: finally:local
+    container_name: finally
+    ports:
+      - "${FINALLY_PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      LLM_MODEL: ${LLM_MODEL:-gemini-3-flash}
+      LLM_MOCK: ${LLM_MOCK:-false}
+      MASSIVE_API_KEY: ${MASSIVE_API_KEY:-}
+      DATABASE_PATH: ${DATABASE_PATH:-/app/db/finally.db}
+      MARKET_STALE_AFTER_SECONDS: ${MARKET_STALE_AFTER_SECONDS:-30}
+      MARKET_SIMULATOR_SEED: ${MARKET_SIMULATOR_SEED:-42}
+    volumes:
+      - ./db:/app/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
