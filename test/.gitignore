@@ -1,0 +1,7 @@
+# Local Playwright dependencies and output
+node_modules/
+playwright-report/
+test-results/
+
+# Keep this directory-level ignore file tracked.
+!.gitignore

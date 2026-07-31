@@ -151,16 +151,11 @@ db/*.db-*
 # Node dependencies
 node_modules/
 frontend/node_modules/
-test/node_modules/
 
 # Frontend build artifacts
 frontend/.next/
 frontend/out/
 frontend/tsconfig.tsbuildinfo
-
-# Playwright artifacts
-test/playwright-report/
-test/test-results/
 
 # Spyder project settings
 .spyderproject
