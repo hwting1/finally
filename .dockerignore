@@ -1,0 +1,17 @@
+.git
+.github
+.planning
+.agents
+.claude
+.codex
+backend/.venv
+backend/.pytest_cache
+backend/**/__pycache__
+db/*.db*
+frontend/.next
+frontend/node_modules
+frontend/out
+frontend/tsconfig.tsbuildinfo
+test/node_modules
+test/playwright-report
+test/test-results

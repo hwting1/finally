@@ -1,0 +1,21 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: finally:local
+    container_name: finally
+    environment:
+      DATABASE_PATH: /app/db/finally.db
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      LLM_MODEL: ${LLM_MODEL:-gemini-3-flash-preview}
+      LLM_MOCK: ${LLM_MOCK:-false}
+      MASSIVE_API_KEY: ${MASSIVE_API_KEY:-}
+      MARKET_STALE_AFTER_SECONDS: ${MARKET_STALE_AFTER_SECONDS:-30}
+      MARKET_SIMULATOR_SEED: ${MARKET_SIMULATOR_SEED:-42}
+    ports:
+      - "${FINALLY_PORT:-8000}:8000"
+    volumes:
+      - ./db:/app/db
+    restart: unless-stopped

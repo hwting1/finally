@@ -130,7 +130,7 @@ LLM_API_KEY=your-llm-provider-api-key-here
 LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
 
 # Default: Google Gemini Flash model used by the OpenAI SDK client
-LLM_MODEL=gemini-3-flash
+LLM_MODEL=gemini-3-flash-preview
 
 # Optional: Massive (Polygon.io) API key for real market data
 # If not set, the built-in market simulator is used (recommended for most users)
@@ -147,7 +147,7 @@ LLM_MOCK=false
 - If `LLM_MOCK=true` → backend returns deterministic mock LLM responses (for E2E tests)
 - If `LLM_API_KEY` is missing and `LLM_MOCK=false` → the app still launches, but chat is disabled with a clear UI/API error explaining that an LLM key is required
 - `LLM_BASE_URL` defaults to Google Gemini OpenAI compatibility: `https://generativelanguage.googleapis.com/v1beta/openai/`
-- `LLM_MODEL` defaults to `gemini-3-flash`
+- `LLM_MODEL` defaults to `gemini-3-flash-preview`
 - If `LLM_BASE_URL` is changed and non-empty → backend passes it to the OpenAI SDK client so other OpenAI-compatible providers can be used
 - If `LLM_BASE_URL` is absent or empty → backend uses the OpenAI SDK default base URL
 - `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL` are read by the backend at startup and should be easy for makers to change in `.env`
@@ -354,7 +354,7 @@ All tables include a `user_id` column defaulting to `"default"`. This is hardcod
 
 When writing code to make calls to LLMs, use the OpenAI Python SDK directly. The LLM client must be configured from environment variables so makers can switch any OpenAI-compatible provider by changing `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` in `.env`, without changing application code. Structured Outputs should be used to interpret the results.
 
-There are `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL` values in the `.env` file in the project root. By default, the plan uses Google Gemini via `LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/` and `LLM_MODEL=gemini-3-flash`.
+There are `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL` values in the `.env` file in the project root. By default, the plan uses Google Gemini via `LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/` and `LLM_MODEL=gemini-3-flash-preview`.
 
 Recommended backend configuration pattern:
 

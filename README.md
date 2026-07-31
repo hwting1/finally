@@ -1,64 +1,40 @@
 # FinAlly
 
-FinAlly is an AI-assisted simulated trading workstation. The current implemented slice is the market data backend: deterministic simulated prices by default, optional Massive REST market data when configured, cache-backed REST diagnostics, Server-Sent Events streaming, and a Rich terminal simulator demo.
+AI-assisted simulated trading workstation with a FastAPI backend, static Next.js frontend, SQLite portfolio state, live price streaming, manual trading, and OpenAI-compatible LLM chat.
 
-Project documentation lives in `planning/`.
+Detailed planning lives in `planning/PLAN.md`.
 
-- Main product plan: `planning/PLAN.md`
-- Current market data summary: `planning/MARKET_DATA_SUMMARY.md`
-- Archived market data design/review notes: `planning/archive/`
+## Run
 
-## Backend
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
 
-The backend is a Python `uv` project in `backend/`.
+Open `http://localhost:8000`, or the port configured with `FINALLY_PORT`.
+
+For deterministic local mode, keep `MASSIVE_API_KEY=` and set `LLM_MOCK=true`. For live LLM chat, set `LLM_MOCK=false`, provide `LLM_API_KEY`, and choose an available `LLM_MODEL`.
+
+## Validate
 
 ```bash
 cd backend
 uv run pytest
 ```
 
-Latest market-data validation:
-
-- `uv run pytest` -> `24 passed`
-- `uv run python -m compileall app tests market_data_demo.py` -> passed
-
-## Market Data Demo
-
-Run the interactive simulator dashboard:
-
 ```bash
-cd backend
-uv run python market_data_demo.py
+cd frontend
+npm install
+npm test
+npm run lint
+npm run build
 ```
 
-The demo runs for 60 seconds or until Ctrl+C. It shows all 10 default tickers with live GBM-simulated prices, sparklines, direction arrows, notable-move events, and a final seed-vs-final session summary.
-
-## Market Data API
-
-Start the backend locally:
-
 ```bash
-cd backend
-uv run uvicorn app.main:app --reload
+docker compose -f test/docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from playwright
 ```
 
-Useful endpoints:
+More details:
 
-- `GET /api/health`
-- `GET /api/market/health`
-- `GET /api/market/prices`
-- `GET /api/market/prices/{ticker}`
-- `GET /api/stream/prices`
-
-By default the backend uses the simulator. Set `MASSIVE_API_KEY` to use the Massive REST provider.
-
-## Configuration
-
-Market data settings are read by `backend/app/core/config.py` from `.env` or `../.env`.
-
-- `MASSIVE_API_KEY`
-- `MARKET_POLL_INTERVAL_SECONDS`
-- `MARKET_STALE_AFTER_SECONDS`
-- `MARKET_SIMULATOR_SEED`
-
-Empty `MASSIVE_API_KEY` means simulator mode. Non-empty `MASSIVE_API_KEY` means Massive mode; the backend does not silently fall back to simulated prices if Massive fails.
+- `backend/README.md` for backend API, configuration, and runtime behavior
+- `test/README.md` for E2E test setup

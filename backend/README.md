@@ -1,100 +1,102 @@
 # FinAlly Backend
 
-This is the Python backend for FinAlly. It currently implements the market data foundation for the trading workstation:
+FastAPI service for the FinAlly trading workstation.
 
-- deterministic simulator by default
-- optional Massive REST provider with `MASSIVE_API_KEY`
-- shared current-price cache
-- background market data refresh service
-- market REST diagnostics
-- Server-Sent Events price stream
-- Rich terminal simulator demo
+## Responsibilities
 
-For the full market data build summary, see `../planning/MARKET_DATA_SUMMARY.md`.
+- Serve API routes and the built frontend static files when available.
+- Maintain SQLite-backed watchlist, portfolio, trades, snapshots, and chat history.
+- Stream current prices over SSE from a shared `PriceCache`.
+- Use the deterministic simulator when `MASSIVE_API_KEY` is empty.
+- Use Massive REST market data when `MASSIVE_API_KEY` is non-empty.
+- Execute manual trades and AI-requested actions through the same validation path.
+- Call an OpenAI-compatible LLM provider for structured chat plans when live chat is enabled.
 
-## Requirements
+Massive mode is explicit: if a non-empty `MASSIVE_API_KEY` is configured, provider failures are reported instead of silently falling back to simulated prices.
 
-- Python 3.11+
-- `uv`
+## Run Locally
 
-Install and run commands from this directory:
-
-```bash
-cd backend
-```
-
-## Run Tests
-
-```bash
-uv run pytest
-```
-
-Current expected result:
-
-```text
-24 passed
-```
-
-## Run The API
+From this directory:
 
 ```bash
 uv run uvicorn app.main:app --reload
 ```
 
-Useful endpoints:
+Useful deterministic local run:
 
+```bash
+MASSIVE_API_KEY= LLM_MOCK=true uv run uvicorn app.main:app --reload
+```
+
+The backend reads settings from environment variables, `backend/.env`, and `../.env`.
+
+## API
+
+Core:
+
+- `GET /`
 - `GET /api/health`
+
+Market data:
+
 - `GET /api/market/health`
 - `GET /api/market/prices`
 - `GET /api/market/prices/{ticker}`
 - `GET /api/stream/prices`
 
-The SSE endpoint emits `prices` events when quotes are available and `heartbeat` events when the cache is empty.
+Watchlist:
 
-## Run The Terminal Demo
+- `GET /api/watchlist`
+- `POST /api/watchlist`
+- `DELETE /api/watchlist/{ticker}`
 
-```bash
-uv run python market_data_demo.py
-```
+Portfolio:
 
-The demo runs for 60 seconds or until Ctrl+C. It shows the 10 default tickers with GBM-simulated prices, direction arrows, sparklines, color-coded changes, notable-move events, and a final seed-vs-final summary.
+- `GET /api/portfolio`
+- `POST /api/portfolio/trade`
+
+AI chat:
+
+- `POST /api/chat`
+
+OpenAPI docs are available at `/docs` when running the backend.
 
 ## Configuration
 
-Settings are defined in `app/core/config.py` and are loaded from `.env` and `../.env`.
-
 | Variable | Default | Meaning |
 |---|---:|---|
-| `MASSIVE_API_KEY` | empty | Empty uses the simulator; non-empty uses Massive REST. |
-| `MARKET_POLL_INTERVAL_SECONDS` | provider default | Overrides market polling cadence. |
+| `DATABASE_PATH` | `../db/finally.db` | SQLite database path. |
+| `MASSIVE_API_KEY` | empty | Empty uses simulator; non-empty uses Massive REST. |
+| `MARKET_POLL_INTERVAL_SECONDS` | provider default | Optional polling cadence override. |
 | `MARKET_STALE_AFTER_SECONDS` | `30.0` | Age after which cached quotes are marked stale. |
 | `MARKET_SIMULATOR_SEED` | `42` | Deterministic simulator seed. |
+| `LLM_MOCK` | `false` | Enables deterministic mock chat actions without a provider key. |
+| `LLM_API_KEY` | empty | Required for live chat when `LLM_MOCK=false`. |
+| `LLM_BASE_URL` | Gemini OpenAI-compatible endpoint | Provider base URL for the OpenAI SDK. |
+| `LLM_MODEL` | `gemini-3-flash-preview` | Structured-output model name; override for another available provider model. |
+| `LLM_MAX_ACTIONS` | `5` | Maximum AI actions accepted per response. |
+| `LLM_MAX_ORDER_NOTIONAL_PORTFOLIO_FRACTION` | `0.5` | Maximum AI order notional as a portfolio-value fraction. |
 
-Massive mode never silently falls back to simulated prices after startup. If Massive authentication, rate limits, or network errors occur, provider health becomes degraded and existing cached values remain available.
+LLM behavior:
 
-## Market Data Architecture
+- `LLM_MOCK=true` returns deterministic local chat responses.
+- `LLM_MOCK=false` with a non-empty `LLM_API_KEY` calls the configured live provider.
+- `LLM_MOCK=false` with an empty `LLM_API_KEY` keeps the app running but disables chat with a structured configuration error.
 
-Main modules:
-
-- `app/main.py`: FastAPI app factory and lifespan wiring.
-- `app/api/market.py`: REST market diagnostics.
-- `app/api/stream.py`: SSE price streaming.
-- `app/core/config.py`: environment-backed settings.
-- `app/market/models.py`: provider-independent quote, bar, and health models.
-- `app/market/provider.py`: provider protocol and provider factory.
-- `app/market/simulator.py`: deterministic simulated market provider.
-- `app/market/massive.py`: Massive REST provider and response mapping.
-- `app/market/cache.py`: shared current-price cache.
-- `app/market/service.py`: tracked ticker set and refresh loop.
-- `app/market/serialization.py`: API/SSE payload serialization.
-- `app/market/validation.py`: ticker normalization and validation.
-
-Downstream services should read current prices from `MarketDataService.cache`. They should not call providers directly.
-
-## Validation Commands
+## Tests
 
 ```bash
 uv run pytest
-uv run python -m compileall app tests market_data_demo.py
-uv run python -c "import market_data_demo; print(len(market_data_demo.TICKERS), market_data_demo.RUN_SECONDS)"
+```
+
+Focused chat tests:
+
+```bash
+uv run pytest tests/test_llm_chat.py
+```
+
+Terminal market-data demo:
+
+```bash
+uv run python market_data_demo.py
 ```

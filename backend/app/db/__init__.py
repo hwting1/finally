@@ -1,0 +1,51 @@
+"""SQLite database services for FinAlly."""
+
+from app.db.connection import connect, database_path
+from app.db.repository import (
+    DEFAULT_SNAPSHOT_LIMIT,
+    DEFAULT_USER_ID,
+    DatabaseValidationError,
+    TradeExecutionError,
+    add_chat_message,
+    add_watchlist_ticker,
+    execute_trade,
+    get_cash_balance,
+    get_chat_messages,
+    get_portfolio_snapshots,
+    get_position,
+    get_positions,
+    get_user_profile,
+    get_watchlist,
+    list_trades,
+    record_portfolio_snapshot,
+    remove_watchlist_ticker,
+    validate_quantity,
+    validate_ticker,
+)
+from app.db.schema import DEFAULT_WATCHLIST_TICKERS, initialize_database
+
+__all__ = [
+    "DEFAULT_SNAPSHOT_LIMIT",
+    "DEFAULT_USER_ID",
+    "DEFAULT_WATCHLIST_TICKERS",
+    "DatabaseValidationError",
+    "TradeExecutionError",
+    "add_chat_message",
+    "add_watchlist_ticker",
+    "connect",
+    "database_path",
+    "execute_trade",
+    "get_cash_balance",
+    "get_chat_messages",
+    "get_portfolio_snapshots",
+    "get_position",
+    "get_positions",
+    "get_user_profile",
+    "get_watchlist",
+    "initialize_database",
+    "list_trades",
+    "record_portfolio_snapshot",
+    "remove_watchlist_ticker",
+    "validate_quantity",
+    "validate_ticker",
+]
